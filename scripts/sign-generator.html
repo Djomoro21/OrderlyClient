@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EIP-712 Signature Generator - Delegate Signer</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #444;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            font-family: monospace;
+            min-height: 100px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .button-secondary {
+            background: #2196F3;
+        }
+        .button-secondary:hover {
+            background: #0b7dda;
+        }
+        .result {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .error {
+            background: #ffebee;
+            border-color: #f44336;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e9;
+            border-color: #4CAF50;
+            color: #2e7d32;
+        }
+        .warning {
+            background: #fff3e0;
+            border-color: #ff9800;
+            color: #e65100;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 EIP-712 Signature Generator</h1>
+        <p class="subtitle">Generate signatures for Orderly Network Delegate Signer registration</p>
+
+        <div class="warning">
+            ⚠️ <strong>Warning:</strong> This tool is for testing purposes only. Never share your private key. 
+            For production, use MetaMask or a hardware wallet.
+        </div>
+
+        <div class="section">
+            <h2>Step 1: Configuration</h2>
+            <div class="grid">
+                <div>
+                    <label for="chainId">Chain ID *</label>
+                    <select id="chainId">
+                        <option value="80094">Berachain (80094)</option>
+                        <option value="1">Ethereum (1)</option>
+                        <option value="42161">Arbitrum (42161)</option>
+                        <option value="10">Optimism (10)</option>
+                        <option value="8453">Base (8453)</option>
+                        <option value="5000">Mantle (5000)</option>
+                        <option value="1329">Sei (1329)</option>
+                        <option value="56">BSC (56)</option>
+                        <option value="34443">Mode (34443)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="network">Network</label>
+                    <select id="network">
+                        <option value="mainnet">Mainnet</option>
+                        <option value="testnet">Testnet</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top: 15px;">
+                <label for="brokerId">Broker ID *</label>
+                <input type="text" id="brokerId" placeholder="e.g., broker_123">
+            </div>
+            <div style="margin-top: 15px;">
+                <label for="delegateContract">Delegate Contract Address *</label>
+                <input type="text" id="delegateContract" placeholder="0x...">
+            </div>
+            <div style="margin-top: 15px;">
+                <label for="txHash">Transaction Hash *</label>
+                <input type="text" id="txHash" placeholder="0x...">
+                <div class="info">
+                    This is the hash of the on-chain transaction that called Vault.delegateSigner()
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Step 2: Get Registration Nonce</h2>
+            <button id="fetchNonce" class="button-secondary">Fetch Nonce from API</button>
+            <div id="nonceResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 3: Signing Method</h2>
+            <div>
+                <label>
+                    <input type="radio" name="signMethod" value="metamask" checked>
+                    MetaMask (Recommended - Browser only)
+                </label>
+            </div>
+            <div>
+                <label>
+                    <input type="radio" name="signMethod" value="privatekey">
+                    Private Key (Testing only - Never use in production)
+                </label>
+            </div>
+            <div id="privateKeySection" style="display: none; margin-top: 15px;">
+                <label for="privateKey">Private Key</label>
+                <input type="password" id="privateKey" placeholder="0x...">
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Step 4: Generate Signature</h2>
+            <button id="generateSignature">Generate Signature</button>
+            <div id="signatureResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 5: API Payload</h2>
+            <button id="copyPayload" class="button-secondary" style="display: none;">Copy to Clipboard</button>
+            <div id="payloadResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const chainIdSelect = document.getElementById('chainId');
+        const networkSelect = document.getElementById('network');
+        const brokerIdInput = document.getElementById('brokerId');
+        const delegateContractInput = document.getElementById('delegateContract');
+        const txHashInput = document.getElementById('txHash');
+        const fetchNonceBtn = document.getElementById('fetchNonce');
+        const nonceResult = document.getElementById('nonceResult');
+        const signMethodRadios = document.querySelectorAll('input[name="signMethod"]');
+        const privateKeySection = document.getElementById('privateKeySection');
+        const privateKeyInput = document.getElementById('privateKey');
+        const generateSignatureBtn = document.getElementById('generateSignature');
+        const signatureResult = document.getElementById('signatureResult');
+        const payloadResult = document.getElementById('payloadResult');
+        const copyPayloadBtn = document.getElementById('copyPayload');
+
+        let registrationNonce = null;
+
+        // Show/hide private key input
+        signMethodRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                privateKeySection.style.display = radio.value === 'privatekey' ? 'block' : 'none';
+            });
+        });
+
+        // Fetch nonce
+        fetchNonceBtn.addEventListener('click', async () => {
+            const network = networkSelect.value;
+            const baseUrl = network === 'mainnet' 
+                ? 'https://api-evm.orderly.org'
+                : 'https://testnet-api-evm.orderly.org';
+
+            try {
+                fetchNonceBtn.disabled = true;
+                fetchNonceBtn.textContent = 'Fetching...';
+                nonceResult.style.display = 'none';
+
+                const response = await fetch(`${baseUrl}/v1/registration_nonce`);
+                const data = await response.json();
+
+                if (data.success) {
+                    registrationNonce = data.data.registration_nonce;
+                    nonceResult.style.display = 'block';
+                    nonceResult.className = 'result success';
+                    nonceResult.textContent = `Registration Nonce: ${registrationNonce}`;
+                } else {
+                    throw new Error(data.message || 'Failed to fetch nonce');
+                }
+            } catch (error) {
+                nonceResult.style.display = 'block';
+                nonceResult.className = 'result error';
+                nonceResult.textContent = `Error: ${error.message}`;
+            } finally {
+                fetchNonceBtn.disabled = false;
+                fetchNonceBtn.textContent = 'Fetch Nonce from API';
+            }
+        });
+
+        // Generate signature
+        generateSignatureBtn.addEventListener('click', async () => {
+            try {
+                // Validate inputs
+                const chainId = parseInt(chainIdSelect.value);
+                const brokerId = brokerIdInput.value.trim();
+                const delegateContract = delegateContractInput.value.trim();
+                const txHash = txHashInput.value.trim();
+                const signMethod = document.querySelector('input[name="signMethod"]:checked').value;
+
+                if (!brokerId || !delegateContract || !txHash) {
+                    throw new Error('Please fill in all required fields');
+                }
+
+                if (!registrationNonce) {
+                    throw new Error('Please fetch the registration nonce first');
+                }
+
+                // Validate addresses
+                if (!ethers.utils.isAddress(delegateContract)) {
+                    throw new Error('Invalid delegate contract address');
+                }
+
+                if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+                    throw new Error('Invalid transaction hash (must be 64 hex characters)');
+                }
+
+                generateSignatureBtn.disabled = true;
+                generateSignatureBtn.textContent = 'Generating...';
+                signatureResult.style.display = 'none';
+                payloadResult.style.display = 'none';
+                copyPayloadBtn.style.display = 'none';
+
+                // Prepare domain
+                const domain = {
+                    name: 'Orderly',
+                    version: '1',
+                    chainId: chainId,
+                    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
+                };
+
+                // Prepare types
+                const types = {
+                    EIP712Domain: [
+                        { name: 'name', type: 'string' },
+                        { name: 'version', type: 'string' },
+                        { name: 'chainId', type: 'uint256' },
+                        { name: 'verifyingContract', type: 'address' }
+                    ],
+                    DelegateSigner: [
+                        { name: 'delegateContract', type: 'address' },
+                        { name: 'brokerId', type: 'string' },
+                        { name: 'chainId', type: 'uint256' },
+                        { name: 'timestamp', type: 'uint64' },
+                        { name: 'registrationNonce', type: 'uint256' },
+                        { name: 'txHash', type: 'bytes32' }
+                    ]
+                };
+
+                // Prepare message
+                const timestamp = Date.now();
+                const message = {
+                    delegateContract: delegateContract,
+                    brokerId: brokerId,
+                    chainId: chainId,
+                    timestamp: timestamp,
+                    registrationNonce: registrationNonce,
+                    txHash: txHash
+                };
+
+                let signature, userAddress;
+
+                // Sign based on method
+                if (signMethod === 'metamask') {
+                    if (typeof window.ethereum === 'undefined') {
+                        throw new Error('MetaMask is not installed');
+                    }
+
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    userAddress = accounts[0];
+
+                    // Check network
+                    const network = await window.ethereum.request({ method: 'eth_chainId' });
+                    if (parseInt(network, 16) !== chainId) {
+                        throw new Error(`Please switch to chain ID ${chainId}. Current: ${parseInt(network, 16)}`);
+                    }
+
+                    signature = await window.ethereum.request({
+                        method: 'eth_signTypedData_v4',
+                        params: [userAddress, JSON.stringify({
+                            domain,
+                            primaryType: 'DelegateSigner',
+                            types,
+                            message
+                        })]
+                    });
+                } else {
+                    // Private key method
+                    const privateKey = privateKeyInput.value.trim();
+                    if (!privateKey) {
+                        throw new Error('Please enter a private key');
+                    }
+
+                    const wallet = new ethers.Wallet(privateKey);
+                    userAddress = wallet.address;
+
+                    signature = await wallet._signTypedData(domain, types, message);
+                }
+
+                // Verify signature
+                const recoveredAddress = ethers.utils.verifyTypedData(domain, types, message, signature);
+                const isValid = recoveredAddress.toLowerCase() === userAddress.toLowerCase();
+
+                // Show signature
+                signatureResult.style.display = 'block';
+                signatureResult.className = 'result ' + (isValid ? 'success' : 'error');
+                signatureResult.textContent = `Signature: ${signature}\n\nUser Address: ${userAddress}\nRecovered Address: ${recoveredAddress}\nValid: ${isValid}`;
+
+                // Prepare API payload
+                const payload = {
+                    message: message,
+                    signature: signature,
+                    userAddress: userAddress
+                };
+
+                // Show payload
+                payloadResult.style.display = 'block';
+                payloadResult.className = 'result success';
+                payloadResult.textContent = JSON.stringify(payload, null, 2);
+
+                copyPayloadBtn.style.display = 'inline-block';
+                copyPayloadBtn.onclick = () => {
+                    navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+                        .then(() => {
+                            copyPayloadBtn.textContent = 'Copied!';
+                            setTimeout(() => {
+                                copyPayloadBtn.textContent = 'Copy to Clipboard';
+                            }, 2000);
+                        })
+                        .catch(err => alert('Failed to copy: ' + err));
+                };
+
+            } catch (error) {
+                signatureResult.style.display = 'block';
+                signatureResult.className = 'result error';
+                signatureResult.textContent = `Error: ${error.message}`;
+            } finally {
+                generateSignatureBtn.disabled = false;
+                generateSignatureBtn.textContent = 'Generate Signature';
+            }
+        });
+    </script>
+</body>
+</html>

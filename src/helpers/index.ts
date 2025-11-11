@@ -391,7 +391,7 @@ export async function withdraw(
     chainId: Number(chainId),
     receiver,
     token: 'USDC',
-    amount: Number(amount),
+    amount, // keep as string to avoid precision/overflow issues
     timestamp: Date.now(),
     withdrawNonce
   };
@@ -448,7 +448,7 @@ export async function delegateWithdraw(
     chainId: Number(chainId),
     receiver,
     token: 'USDC',
-    amount: Number(amount),
+    amount, // keep as string to avoid precision/overflow issues
     timestamp: Date.now(),
     withdrawNonce
   };

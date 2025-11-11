@@ -25,6 +25,8 @@ export function getVaultAddress(chainId: SupportedChainIds): string {
       .with('0x38', () => '0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9')
       // mode
       .with('0x868b', () => '0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9')
+      // berachain
+      .with('0x138de', () => '0x816f722424b49cf1275cc86da9840fbd5a6167e9')
       // sepolia
       .with('0xaa36a7', () => '0x0EaC556c0C2321BA25b9DC01e4e3c95aD5CDCd2f')
       // arbitrum sepolia
@@ -69,6 +71,8 @@ export function getUSDCAddress(chainId: SupportedChainIds): string {
       .with('0x38', () => '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d')
       // mode
       .with('0x868b', () => '0xd988097fb8612cc24eeC14542bC03424c656005f')
+      // berachain
+      .with('0x138de', () => '0x549943e04f40284185054145c6E4e9568C1D3241')
       // sepolia
       .with('0xaa36a7', () => '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238')
       // arbitrum sepolia

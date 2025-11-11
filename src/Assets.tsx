@@ -34,6 +34,8 @@ export const Assets: FC<{
   const [vaultBalance, setVaultBalance] = useState<number>();
   const [usdcContract, setUsdcContract] = useState<NativeUSDC>();
   const [unsettledPnL, setUnsettledPnL] = useState<number>();
+  const [isBusy, setIsBusy] = useState<boolean>(false);
+  const [actionStatus, setActionStatus] = useState<{ type: 'success' | 'error'; text: string }>();
 
   const [{ wallet }] = useConnectWallet();
   const [{ connectedChain }] = useSetChain();
@@ -152,6 +154,16 @@ export const Assets: FC<{
         </Callout.Root>
       )}
 
+      {actionStatus && (
+        <Callout.Root
+          color={actionStatus.type === 'success' ? 'green' : 'red'}
+          variant="soft"
+          style={{ alignSelf: 'center' }}
+        >
+          <Callout.Text>{actionStatus.text}</Callout.Text>
+        </Callout.Root>
+      )}
+
       <Table.Root>
         <Table.Body>
           <Table.Row>
@@ -207,7 +219,8 @@ export const Assets: FC<{
               !connectedChain ||
               !brokerId ||
               !balance ||
-              balance < parseUnits(amount, usdcDecimals)
+              balance < parseUnits(amount, usdcDecimals) ||
+              isBusy
             }
             onClick={async () => {
               if (
@@ -223,23 +236,43 @@ export const Assets: FC<{
               const amountBN = parseUnits(amount, usdcDecimals);
               if (balance < amountBN) return;
               if (allowance < amountBN) {
-                await usdcContract.approve(
-                  getVaultAddress(connectedChain.id as SupportedChainIds),
-                  amountBN
-                );
-                const allow = await usdcContract.allowance(
-                  wallet.accounts[0].address,
-                  getVaultAddress(connectedChain.id as SupportedChainIds)
-                );
-                setAllowance(allow);
+                try {
+                  setIsBusy(true);
+                  setActionStatus(undefined);
+                  await usdcContract.approve(
+                    getVaultAddress(connectedChain.id as SupportedChainIds),
+                    amountBN
+                  );
+                  const allow = await usdcContract.allowance(
+                    wallet.accounts[0].address,
+                    getVaultAddress(connectedChain.id as SupportedChainIds)
+                  );
+                  setAllowance(allow);
+                  setActionStatus({ type: 'success', text: 'Approval successful.' });
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setActionStatus({ type: 'error', text: `Approval failed: ${msg}` });
+                } finally {
+                  setIsBusy(false);
+                }
               } else {
-                await deposit(
-                  wallet,
-                  connectedChain.id as SupportedChainIds,
-                  brokerId,
-                  amountBN.toString(),
-                  accountId
-                );
+                try {
+                  setIsBusy(true);
+                  setActionStatus(undefined);
+                  await deposit(
+                    wallet,
+                    connectedChain.id as SupportedChainIds,
+                    brokerId,
+                    amountBN.toString(),
+                    accountId
+                  );
+                  setActionStatus({ type: 'success', text: 'Deposit submitted.' });
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setActionStatus({ type: 'error', text: `Deposit failed: ${msg}` });
+                } finally {
+                  setIsBusy(false);
+                }
               }
             }}
           >
@@ -255,7 +288,8 @@ export const Assets: FC<{
               !connectedChain ||
               !brokerId ||
               !balance ||
-              balance < parseUnits(amount, usdcDecimals)
+              balance < parseUnits(amount, usdcDecimals) ||
+              isBusy
             }
             onClick={async () => {
               if (
@@ -271,25 +305,45 @@ export const Assets: FC<{
               const amountBN = parseUnits(amount, usdcDecimals);
               if (balance < amountBN) return;
               if (allowance < amountBN) {
-                await usdcContract.approve(
-                  getVaultAddress(connectedChain.id as SupportedChainIds),
-                  amountBN
-                );
-                const allow = await usdcContract.allowance(
-                  wallet.accounts[0].address,
-                  getVaultAddress(connectedChain.id as SupportedChainIds)
-                );
-                setAllowance(allow);
+                try {
+                  setIsBusy(true);
+                  setActionStatus(undefined);
+                  await usdcContract.approve(
+                    getVaultAddress(connectedChain.id as SupportedChainIds),
+                    amountBN
+                  );
+                  const allow = await usdcContract.allowance(
+                    wallet.accounts[0].address,
+                    getVaultAddress(connectedChain.id as SupportedChainIds)
+                  );
+                  setAllowance(allow);
+                  setActionStatus({ type: 'success', text: 'Approval successful.' });
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setActionStatus({ type: 'error', text: `Approval failed: ${msg}` });
+                } finally {
+                  setIsBusy(false);
+                }
               } else {
-                await delegateDeposit(
-                  wallet,
-                  connectedChain.id as SupportedChainIds,
-                  brokerId,
-                  contractAddress,
-                  amountBN.toString(),
-                  contractAddress,
-                  accountId
-                );
+                try {
+                  setIsBusy(true);
+                  setActionStatus(undefined);
+                  await delegateDeposit(
+                    wallet,
+                    connectedChain.id as SupportedChainIds,
+                    brokerId,
+                    contractAddress,
+                    amountBN.toString(),
+                    contractAddress,
+                    accountId
+                  );
+                  setActionStatus({ type: 'success', text: 'Deposit to contract submitted.' });
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setActionStatus({ type: 'error', text: `Deposit failed: ${msg}` });
+                } finally {
+                  setIsBusy(false);
+                }
               }
             }}
           >
@@ -299,20 +353,46 @@ export const Assets: FC<{
 
         {showEOA ? (
           <Button
-            disabled={!wallet || !connectedChain || !brokerId || !orderlyKey}
+            disabled={
+              !wallet ||
+              !connectedChain ||
+              !brokerId ||
+              !orderlyKey ||
+              isBusy ||
+              !amount ||
+              parseUnits(String(vaultBalance ?? 0), 6) < parseUnits(amount || '0', 6) ||
+              parseUnits(amount || '0', 6) < 2_500_000n // 2.5 USDC fee
+            }
             onClick={async () => {
               if (!wallet || !connectedChain || !orderlyKey || !amount) return;
               const amountBN = parseUnits(amount, 6);
               if (parseUnits(String(vaultBalance), 6) < amountBN) return;
-              await withdraw(
-                wallet,
-                connectedChain.id as SupportedChainIds,
-                brokerId,
-                accountId,
-                orderlyKey,
-                amountBN.toString(),
-                wallet.accounts[0].address
-              );
+              if (amountBN < 2_500_000n) {
+                setActionStatus({
+                  type: 'error',
+                  text: 'Amount must be at least 2.5 USDC to cover fee.'
+                });
+                return;
+              }
+              try {
+                setIsBusy(true);
+                setActionStatus(undefined);
+                await withdraw(
+                  wallet,
+                  connectedChain.id as SupportedChainIds,
+                  brokerId,
+                  accountId,
+                  orderlyKey,
+                  amountBN.toString(),
+                  wallet.accounts[0].address
+                );
+                setActionStatus({ type: 'success', text: 'Withdraw submitted.' });
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                setActionStatus({ type: 'error', text: `Withdraw failed: ${msg}` });
+              } finally {
+                setIsBusy(false);
+              }
             }}
           >
             Withdraw
@@ -326,22 +406,36 @@ export const Assets: FC<{
               !amount ||
               !brokerId ||
               parseUnits(String(vaultBalance), 6) < parseUnits(amount, 6) ||
-              parseUnits(amount, 6) < 2_500_000n // fee
+              parseUnits(amount, 6) < 2_500_000n || // fee
+              isBusy
             }
             onClick={async () => {
               if (!wallet || !connectedChain || !orderlyKey || !amount) return;
               const amountBN = parseUnits(amount, 6);
               if (parseUnits(String(vaultBalance), 6) < amountBN) return;
-              await delegateWithdraw(
-                wallet,
-                connectedChain.id as SupportedChainIds,
-                brokerId,
-                contractAddress,
-                accountId,
-                orderlyKey,
-                amountBN.toString(),
-                contractAddress
-              );
+              try {
+                setIsBusy(true);
+                setActionStatus(undefined);
+                await delegateWithdraw(
+                  wallet,
+                  connectedChain.id as SupportedChainIds,
+                  brokerId,
+                  contractAddress,
+                  accountId,
+                  orderlyKey,
+                  amountBN.toString(),
+                  contractAddress
+                );
+                setActionStatus({
+                  type: 'success',
+                  text: 'Withdraw from contract submitted.'
+                });
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                setActionStatus({ type: 'error', text: `Withdraw failed: ${msg}` });
+              } finally {
+                setIsBusy(false);
+              }
             }}
           >
             Withdraw from Contract

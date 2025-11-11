@@ -68,6 +68,14 @@ export const supportedChains = [
     rpcUrl: 'https://mainnet.mode.network'
   },
   {
+    network: 'mainnet',
+    icon: './assets/questionmark.svg',
+    id: '0x138de',
+    token: 'BERA',
+    label: 'Berachain',
+    rpcUrl: 'https://rpc.berachain.com'
+  },
+  {
     network: 'testnet',
     icon: './assets/sepolia.svg',
     id: '0xaa36a7',
