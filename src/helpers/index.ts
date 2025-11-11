@@ -625,6 +625,52 @@ export async function getUnsettledPnL(
   return positions.reduce((acc, position) => acc + position.unsettled_pnl, 0);
 }
 
+export async function getPositions(
+  chainId: SupportedChainIds,
+  accountId: string,
+  orderlyKey: Uint8Array
+): Promise<API.Position[]> {
+  const res = await signAndSendRequest(
+    accountId,
+    orderlyKey,
+    `${getBaseUrl(chainId)}/v1/positions`
+  );
+  if (!res.ok) {
+    throw new Error(`Could not fetch positions`);
+  }
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.message);
+  }
+  return json.data.rows as API.Position[];
+}
+
+export type LeverageSetting = {
+  symbol: string;
+  leverage: number;
+};
+
+export async function getLeverageSetting(
+  chainId: SupportedChainIds,
+  accountId: string,
+  orderlyKey: Uint8Array,
+  symbol: string
+): Promise<LeverageSetting> {
+  const res = await signAndSendRequest(
+    accountId,
+    orderlyKey,
+    `${getBaseUrl(chainId)}/v1/client/leverage?symbol=${encodeURIComponent(symbol)}`
+  );
+  if (!res.ok) {
+    throw new Error(`Could not fetch leverage setting`);
+  }
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.message);
+  }
+  return json.data as LeverageSetting;
+}
+
 async function signAndSendRequest(
   accountId: string,
   orderlyKey: Uint8Array | string,

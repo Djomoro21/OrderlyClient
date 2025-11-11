@@ -17,7 +17,10 @@ import {
   withdraw,
   SupportedChainIds,
   deposit,
-  getUSDCDecimals
+  getUSDCDecimals,
+  getLeverageSetting,
+  getPositions,
+  LeverageSetting
 } from './helpers';
 
 export const Assets: FC<{
@@ -36,6 +39,9 @@ export const Assets: FC<{
   const [unsettledPnL, setUnsettledPnL] = useState<number>();
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [actionStatus, setActionStatus] = useState<{ type: 'success' | 'error'; text: string }>();
+  const [leverageSettings, setLeverageSettings] = useState<Map<string, LeverageSetting>>(new Map());
+  const [leverageSymbol, setLeverageSymbol] = useState<string>('');
+  const [loadingLeverage, setLoadingLeverage] = useState<boolean>(false);
 
   const [{ wallet }] = useConnectWallet();
   const [{ connectedChain }] = useSetChain();
@@ -196,6 +202,114 @@ export const Assets: FC<{
           </Table.Row>
         </Table.Body>
       </Table.Root>
+
+      {orderlyKey && (
+        <Flex direction="column" gap="2" style={{ width: '100%', maxWidth: '600px' }}>
+          <Heading size="4">Leverage Settings</Heading>
+          
+          <Flex gap="2" align="center">
+            <TextField.Root
+              placeholder="Enter symbol (e.g., PERP_BTC_USDC)"
+              value={leverageSymbol}
+              onChange={(event) => setLeverageSymbol(event.target.value)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              disabled={!leverageSymbol || loadingLeverage || !connectedChain || !orderlyKey}
+              onClick={async () => {
+                if (!connectedChain || !orderlyKey || !leverageSymbol) return;
+                setLoadingLeverage(true);
+                try {
+                  const leverage = await getLeverageSetting(
+                    connectedChain.id as SupportedChainIds,
+                    accountId,
+                    orderlyKey,
+                    leverageSymbol
+                  );
+                  setLeverageSettings((prev) => {
+                    const newMap = new Map(prev);
+                    newMap.set(leverageSymbol, leverage);
+                    return newMap;
+                  });
+                  setActionStatus({ type: 'success', text: `Leverage for ${leverageSymbol}: ${leverage.leverage}x` });
+                } catch (error) {
+                  setActionStatus({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to fetch leverage setting'
+                  });
+                } finally {
+                  setLoadingLeverage(false);
+                }
+              }}
+            >
+              {loadingLeverage ? 'Loading...' : 'Get Leverage'}
+            </Button>
+            <Button
+              variant="soft"
+              disabled={!connectedChain || !orderlyKey || loadingLeverage}
+              onClick={async () => {
+                if (!connectedChain || !orderlyKey) return;
+                setLoadingLeverage(true);
+                try {
+                  const positions = await getPositions(
+                    connectedChain.id as SupportedChainIds,
+                    accountId,
+                    orderlyKey
+                  );
+                  const symbols = [...new Set(positions.map((p) => p.symbol))];
+                  
+                  // Fetch leverage for all symbols with positions
+                  const leveragePromises = symbols.map((symbol) =>
+                    getLeverageSetting(
+                      connectedChain.id as SupportedChainIds,
+                      accountId,
+                      orderlyKey,
+                      symbol
+                    ).catch(() => null)
+                  );
+                  
+                  const leverages = await Promise.all(leveragePromises);
+                  const newMap = new Map<string, LeverageSetting>();
+                  leverages.forEach((lev, index) => {
+                    if (lev) {
+                      newMap.set(symbols[index], lev);
+                    }
+                  });
+                  
+                  setLeverageSettings(newMap);
+                  if (newMap.size > 0) {
+                    setActionStatus({ type: 'success', text: `Loaded leverage for ${newMap.size} symbol(s)` });
+                  } else {
+                    setActionStatus({ type: 'error', text: 'No positions found or failed to fetch leverage' });
+                  }
+                } catch (error) {
+                  setActionStatus({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to fetch leverage settings'
+                  });
+                } finally {
+                  setLoadingLeverage(false);
+                }
+              }}
+            >
+              Load from Positions
+            </Button>
+          </Flex>
+
+          {leverageSettings.size > 0 && (
+            <Table.Root>
+              <Table.Body>
+                {Array.from(leverageSettings.entries()).map(([symbol, setting]) => (
+                  <Table.Row key={symbol}>
+                    <Table.RowHeaderCell>{symbol}:</Table.RowHeaderCell>
+                    <Table.Cell>{setting.leverage}x</Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          )}
+        </Flex>
+      )}
 
       <Flex direction="column" gap="4">
         <TextField.Root
